@@ -54,7 +54,7 @@
         <div class="w-full flex justify-between items-center h-full max-w-screen-2xl mx-auto px-6">
             
             <div class="h-full flex items-center cursor-pointer group" onclick="loadHome()">
-                <img src="static/roririlogo1.png" alt="Company Logo" class="h-8 md:h-10 object-contain group-hover:scale-105 transition duration-300">
+                <img src="roririlogo1.png" onerror="this.src='static/roririlogo1.png'" alt="Company Logo" class="h-8 md:h-10 object-contain group-hover:scale-105 transition duration-300">
             </div>
             
             <ul id="main-nav" class="hidden lg:flex space-x-6 xl:space-x-8 text-[11px] font-bold uppercase tracking-widest text-darkBg h-full items-center"></ul>
@@ -133,7 +133,7 @@
         </div>
     </div>
 
-    <main id="app-root" class="flex-1"></main>
+    <main id="app-root" class="flex-1 w-full"></main>
 
     <footer class="bg-[#111111] text-white pt-16 pb-8 w-full mt-auto">
         <div class="max-w-screen-2xl mx-auto px-6 lg:px-12 mb-12 flex flex-col items-center justify-center border-b border-gray-800 pb-12 gap-6 text-center">
@@ -206,7 +206,6 @@
                 document.getElementById('user-profile').classList.add('flex');
                 document.getElementById('user-avatar').src = user.photoURL;
                 document.getElementById('user-name').innerText = user.displayName;
-                console.log("User logged in:", user.email);
 
                 try {
                     const res = await fetch(`${API_BASE_URL}/api/wishlist/${user.email}`);
@@ -214,8 +213,7 @@
                         myWishlistIds = await res.json();
                         if(document.getElementById('home-packages-grid')) loadHome();
                     }
-                } catch(e) { console.error("Failed to load wishlist from DB", e); }
-                
+                } catch(e) {}
             } else {
                 currentUser = null;
                 myWishlistIds = []; 
@@ -227,7 +225,6 @@
 
         function signInWithGoogle() {
             auth.signInWithPopup(provider).catch((error) => {
-                console.error("Login Error:", error);
                 alert("Login Failed: " + error.message);
             });
         }
@@ -265,22 +262,19 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: currentUser.email, package_id: packageId, action: action })
                 });
-                console.log(`DB Update Success: ${action} package ${packageId}`);
-            } catch(e) { console.error("Wishlist DB Update Failed", e); }
+            } catch(e) {}
         }
 
         async function removeFromWishlist(packageId) {
             if(confirm("Are you sure you want to remove this package from your wishlist?")) {
                 myWishlistIds = myWishlistIds.filter(id => id !== packageId);
-                
                 try {
                     await fetch(`${API_BASE_URL}/api/wishlist/toggle`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ email: currentUser.email, package_id: packageId, action: 'remove' })
                     });
-                } catch(e) { console.error("Wishlist DB Remove Failed", e); }
-
+                } catch(e) {}
                 loadWishlistPage(); 
             }
         }
@@ -343,7 +337,7 @@
                 const res = await fetch(`${API_BASE_URL}/api/packages/all`);
                 globalPackages = await res.json();
                 return globalPackages;
-            } catch(e) { console.error("API Error", e); return []; }
+            } catch(e) { return []; }
         }
 
         function generatePackageCard(pkg) {
@@ -485,6 +479,39 @@
             }, 1500);
         }
 
+        function generateAIBuilderHTML() {
+            return `
+            <section id="ai-builder" class="py-24 bg-darkBg text-white relative overflow-hidden mt-10">
+                <div class="absolute inset-0 opacity-10 bg-[url('https://loremflickr.com/1920/1080/travel,map?lock=55')] bg-cover bg-center"></div>
+                <div class="max-w-5xl mx-auto px-6 relative z-10">
+                    <div class="text-center mb-12">
+                        <h2 class="text-4xl md:text-5xl font-serif font-bold mb-4">✨ Design Your AI Trip</h2>
+                        <p class="text-brandLight text-sm font-bold uppercase tracking-widest">Powered by Gemini AI Engine</p>
+                    </div>
+                    <div class="bg-white text-gray-800 rounded-2xl shadow-2xl p-8 md:p-10 border-t-4 border-brand">
+                        <form id="ai-itinerary-form" onsubmit="generateItinerary(event)" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div><label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Destination</label><input type="text" id="ai-dest" placeholder="e.g., Manali, Paris, Bali" class="w-full border border-gray-200 p-4 text-sm rounded outline-none focus:border-brand transition bg-gray-50" required></div>
+                            <div><label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Duration (Days)</label><input type="number" id="ai-days" min="1" max="30" placeholder="e.g., 5" class="w-full border border-gray-200 p-4 text-sm rounded outline-none focus:border-brand transition bg-gray-50" required></div>
+                            <div><label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Budget (₹)</label><input type="number" id="ai-budget" placeholder="e.g., 50000" class="w-full border border-gray-200 p-4 text-sm rounded outline-none focus:border-brand transition bg-gray-50" required></div>
+                            <div><label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Travel Vibe</label>
+                                <select id="ai-vibe" class="w-full border border-gray-200 p-4 text-sm rounded outline-none focus:border-brand transition bg-gray-50" required>
+                                    <option value="Romantic/Honeymoon">Romantic / Honeymoon</option><option value="Adventure">Adventure & Thrill</option><option value="Relaxing">Relaxing & Chill</option><option value="Cultural">Cultural & Historic</option><option value="Family">Family Friendly</option>
+                                </select>
+                            </div>
+                            <div class="md:col-span-2 mt-4 text-center"><button type="submit" id="generate-btn" class="bg-brand text-white font-bold uppercase tracking-widest px-14 py-4 rounded-full text-sm hover:bg-teal-800 transition shadow-lg w-full md:w-auto">✨ Generate AI Plan</button></div>
+                        </form>
+                        <div id="ai-result-box" class="mt-10 hidden border-t border-gray-100 pt-8">
+                            <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                                <h3 class="text-2xl font-serif font-bold text-darkBg">Your Custom AI Itinerary:</h3>
+                                <button id="download-pdf-btn" onclick="downloadItineraryPDF()" class="hidden bg-darkBg text-white px-5 py-3 rounded-full text-[10px] uppercase font-bold tracking-widest hover:bg-brand transition shadow-md flex items-center gap-2">📥 Download PDF</button>
+                            </div>
+                            <div id="ai-itinerary-content" class="text-gray-700 leading-relaxed text-sm space-y-4 bg-gray-50 p-6 rounded-xl border border-gray-100"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>`;
+        }
+
         async function generateItinerary(e) {
             e.preventDefault();
             const btn = document.getElementById('generate-btn');
@@ -565,6 +592,21 @@
             });
         }
 
+        function generateContactForm(title) {
+            return `
+                <section id="contact-form" class="py-20 px-6 bg-gray-100">
+                    <div class="max-w-4xl mx-auto bg-white p-8 md:p-12 shadow-[0_20px_50px_rgba(0,0,0,0.05)] rounded-2xl border border-gray-100">
+                        <h2 class="font-serif text-4xl mb-8 text-darkBg font-bold text-center">${title}</h2>
+                        <form class="space-y-5" onsubmit="handleFormSubmit(event)">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5"><input type="text" name="Name" placeholder="Name *" class="w-full border border-gray-200 p-4 text-sm outline-none rounded bg-gray-50" required><input type="text" name="City" placeholder="City *" class="w-full border border-gray-200 p-4 text-sm outline-none rounded bg-gray-50" required></div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5"><input type="email" name="Email" placeholder="Email Address *" class="w-full border border-gray-200 p-4 text-sm outline-none rounded bg-gray-50" required><input type="tel" name="Phone" placeholder="Phone *" class="w-full border border-gray-200 p-4 text-sm outline-none rounded bg-gray-50" required></div>
+                            <input type="text" name="Destination" id="travel-destination-input" placeholder="Travel Destination" class="w-full border border-gray-200 p-4 text-sm outline-none rounded bg-gray-50 font-bold text-darkBg">
+                            <div class="text-center pt-4"><button type="submit" class="bg-brand text-white font-bold uppercase tracking-widest px-14 py-4 rounded-full text-sm hover:bg-teal-800 transition">Submit Enquiry</button></div>
+                        </form>
+                    </div>
+                </section>`;
+        }
+
         const siteData = {
             home: { title: "Home", action: "loadHome()" },
             company: { title: "Company", isSimpleDropdown: true, links: ["About Us", "History", "Awards", "Careers", "Blog", "FAQs"] },
@@ -595,56 +637,6 @@
             navRoot.innerHTML = navHTML;
         }
 
-        function generateAIBuilderHTML() {
-            return `
-            <section id="ai-builder" class="py-24 bg-darkBg text-white relative overflow-hidden mt-10">
-                <div class="absolute inset-0 opacity-10 bg-[url('https://loremflickr.com/1920/1080/travel,map?lock=55')] bg-cover bg-center"></div>
-                <div class="max-w-5xl mx-auto px-6 relative z-10">
-                    <div class="text-center mb-12">
-                        <h2 class="text-4xl md:text-5xl font-serif font-bold mb-4">✨ Design Your AI Trip</h2>
-                        <p class="text-brandLight text-sm font-bold uppercase tracking-widest">Powered by Gemini AI Engine</p>
-                    </div>
-                    <div class="bg-white text-gray-800 rounded-2xl shadow-2xl p-8 md:p-10 border-t-4 border-brand">
-                        <form id="ai-itinerary-form" onsubmit="generateItinerary(event)" class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div><label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Destination</label><input type="text" id="ai-dest" placeholder="e.g., Manali, Paris, Bali" class="w-full border border-gray-200 p-4 text-sm rounded outline-none focus:border-brand transition bg-gray-50" required></div>
-                            <div><label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Duration (Days)</label><input type="number" id="ai-days" min="1" max="30" placeholder="e.g., 5" class="w-full border border-gray-200 p-4 text-sm rounded outline-none focus:border-brand transition bg-gray-50" required></div>
-                            <div><label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Budget (₹)</label><input type="number" id="ai-budget" placeholder="e.g., 50000" class="w-full border border-gray-200 p-4 text-sm rounded outline-none focus:border-brand transition bg-gray-50" required></div>
-                            <div><label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Travel Vibe</label>
-                                <select id="ai-vibe" class="w-full border border-gray-200 p-4 text-sm rounded outline-none focus:border-brand transition bg-gray-50" required>
-                                    <option value="Romantic/Honeymoon">Romantic / Honeymoon</option><option value="Adventure">Adventure & Thrill</option><option value="Relaxing">Relaxing & Chill</option><option value="Cultural">Cultural & Historic</option><option value="Family">Family Friendly</option>
-                                </select>
-                            </div>
-                            <div class="md:col-span-2 mt-4 text-center"><button type="submit" id="generate-btn" class="bg-brand text-white font-bold uppercase tracking-widest px-14 py-4 rounded-full text-sm hover:bg-teal-800 transition shadow-lg w-full md:w-auto">✨ Generate AI Plan</button></div>
-                        </form>
-                        <div id="ai-result-box" class="mt-10 hidden border-t border-gray-100 pt-8">
-                            <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-                                <h3 class="text-2xl font-serif font-bold text-darkBg">Your Custom AI Itinerary:</h3>
-                                <button id="download-pdf-btn" onclick="downloadItineraryPDF()" class="hidden bg-darkBg text-white px-5 py-3 rounded-full text-[10px] uppercase font-bold tracking-widest hover:bg-brand transition shadow-md flex items-center gap-2">📥 Download PDF</button>
-                            </div>
-                            <div id="ai-itinerary-content" class="text-gray-700 leading-relaxed text-sm space-y-4 bg-gray-50 p-6 rounded-xl border border-gray-100"></div>
-                        </div>
-                    </div>
-                </div>
-            </section>`;
-        }
-
-        function generateContactForm(title) {
-            return `
-                <section id="contact-form" class="py-20 px-6 bg-gray-100">
-                    <div class="max-w-4xl mx-auto bg-white p-8 md:p-12 shadow-[0_20px_50px_rgba(0,0,0,0.05)] rounded-2xl border border-gray-100">
-                        <h2 class="font-serif text-4xl mb-8 text-darkBg font-bold text-center">${title}</h2>
-                        
-                        <form class="space-y-5" onsubmit="handleFormSubmit(event)">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5"><input type="text" name="Name" placeholder="Name *" class="w-full border border-gray-200 p-4 text-sm outline-none rounded bg-gray-50" required><input type="text" name="City" placeholder="City *" class="w-full border border-gray-200 p-4 text-sm outline-none rounded bg-gray-50" required></div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5"><input type="email" name="Email" placeholder="Email Address *" class="w-full border border-gray-200 p-4 text-sm outline-none rounded bg-gray-50" required><input type="tel" name="Phone" placeholder="Phone *" class="w-full border border-gray-200 p-4 text-sm outline-none rounded bg-gray-50" required></div>
-                            <input type="text" name="Destination" id="travel-destination-input" placeholder="Travel Destination" class="w-full border border-gray-200 p-4 text-sm outline-none rounded bg-gray-50 font-bold text-darkBg">
-                            <div class="text-center pt-4"><button type="submit" class="bg-brand text-white font-bold uppercase tracking-widest px-14 py-4 rounded-full text-sm hover:bg-teal-800 transition">Submit Enquiry</button></div>
-                        </form>
-                    </div>
-                </section>`;
-        }
-
-        // 🌟 LOAD HOME - INITIALIZATION 🌟
         async function loadHome() {
             document.getElementById('app-root').innerHTML = `
                 <div class="page-fade-enter">
@@ -672,6 +664,7 @@
             else { grid.innerHTML = `<div class="col-span-full text-center py-20"><p class="text-gray-500">No packages found. Add some in the Admin Panel!</p></div>`; }
         }
 
+        // 🌟 UPDATED INDIA FILTER LOGIC 🌟
         async function loadCategoryPage(categoryKey) {
             const catData = siteData[categoryKey] || { title: categoryKey };
             document.getElementById('app-root').innerHTML = `
@@ -684,8 +677,27 @@
                     ${generateContactForm("Enquire for " + catData.title)}
                 </div>`;
             window.scrollTo(0,0);
+            
             const packages = globalPackages.length ? globalPackages : await fetchRealPackages();
-            const filtered = packages.filter(p => (p.category && p.category.toLowerCase().includes(catData.title.toLowerCase())) || catData.title === 'Packages');
+            
+            const filtered = packages.filter(p => {
+                const searchStr = catData.title.toLowerCase();
+                if (searchStr === 'packages') return true; 
+                
+                const catStr = (p.category || '').toLowerCase();
+                const destStr = (p.destination || '').toLowerCase();
+                
+                if (searchStr === 'india') {
+                    return catStr.includes('india') || 
+                           catStr.includes('west') || 
+                           catStr.includes('south') || 
+                           catStr.includes('north') ||
+                           ['manali', 'kashmir', 'agra', 'kerala', 'ooty', 'kodaikanal', 'goa', 'rajasthan', 'andaman', 'india'].includes(destStr);
+                }
+                
+                return catStr.includes(searchStr);
+            });
+
             const grid = document.getElementById('cat-packages-grid');
             if(filtered.length > 0) { grid.innerHTML = filtered.map(p => generatePackageCard(p)).join(''); } 
             else { grid.innerHTML = `<div class="col-span-full text-center py-20 bg-white rounded-2xl shadow-sm"><h3 class="text-2xl font-serif text-darkBg mb-4">New ${catData.title} Packages are being curated!</h3><p class="text-gray-500">Check back soon or send us an enquiry.</p></div>`; }
@@ -711,7 +723,7 @@
         }
 
         function loadGroupToursPage() { loadCategoryPage('Group Tours'); }
-        
+
         function loadWeddingPage() {
             let venuesHTML = ''; const venues = ["Bali", "Udaipur Palace", "Goa Beach", "Maldives Resort"];
             venues.forEach((v, i) => { venuesHTML += `<div class="relative h-[400px] rounded-xl overflow-hidden group cursor-pointer shadow-lg" onclick="prepareBooking('${v} Wedding')"><img src="https://loremflickr.com/600/800/wedding,${v.split(' ')[0]}?lock=${i+80}" class="w-full h-full object-cover transition duration-700 group-hover:scale-105 brightness-[0.8]"><div class="absolute inset-0 bg-gradient-to-t from-darkBg/90 to-transparent"></div><div class="absolute bottom-0 p-6 text-center w-full"><h3 class="font-serif text-3xl text-white mb-2">${v}</h3><button class="border border-white text-white px-6 py-2 text-[10px] uppercase tracking-widest hover:bg-white hover:text-darkBg transition">View Venues</button></div></div>`; });
@@ -734,7 +746,11 @@
                                 Kalakad,<br>
                                 Tirunelveli - 627 502
                             </p>
-                            
+                            <div class="inline-block bg-gray-50 px-6 py-3 rounded-lg border border-gray-100">
+                                <p class="text-sm font-bold text-brand flex items-center gap-2">
+                                    📞 +91 6374644637
+                                </p>
+                            </div>
                         </div>
                     </div>
                     ${generateContactForm("Drop Us a Message")}
@@ -747,7 +763,6 @@
             window.scrollTo(0,0);
         }
 
-        // Fire it up!
         window.addEventListener('DOMContentLoaded', () => { renderNavbar(); loadHome(); });
     </script>
 </body>
