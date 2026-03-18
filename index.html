@@ -38,6 +38,8 @@
         ::-webkit-scrollbar-thumb { background: #0f766e; border-radius: 10px; }
         .modal-active { display: flex !important; opacity: 1 !important; }
         .modal-content-active { transform: scale(1) translateY(0) !important; opacity: 1 !important; }
+        
+        /* Wishlist Heart Animation */
         .heart-active { color: #ef4444 !important; transform: scale(1.2); transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
     </style>
 </head>
@@ -162,6 +164,7 @@
         let currentUser = null; 
         let myWishlistIds = []; 
 
+        // 🌟 FIXED: FETCH WISHLIST FROM DB ON LOGIN 🌟
         auth.onAuthStateChanged(async (user) => {
             if (user) {
                 currentUser = user;
@@ -170,14 +173,18 @@
                 document.getElementById('user-profile').classList.add('flex');
                 document.getElementById('user-avatar').src = user.photoURL;
                 document.getElementById('user-name').innerText = user.displayName;
+                console.log("User logged in:", user.email);
 
+                // Fetch Database Wishlist
                 try {
                     const res = await fetch(`${API_BASE_URL}/api/wishlist/${user.email}`);
                     if(res.ok) {
                         myWishlistIds = await res.json();
+                        // Re-render home to show active hearts
                         if(document.getElementById('home-packages-grid')) loadHome();
                     }
-                } catch(e) {}
+                } catch(e) { console.error("Failed to load wishlist from DB", e); }
+                
             } else {
                 currentUser = null;
                 myWishlistIds = []; 
@@ -189,6 +196,7 @@
 
         function signInWithGoogle() {
             auth.signInWithPopup(provider).catch((error) => {
+                console.error("Login Error:", error);
                 alert("Login Failed: " + error.message);
             });
         }
@@ -201,6 +209,7 @@
             });
         }
 
+        // 🌟 FIXED: SEND WISHLIST ACTION TO BACKEND 🌟
         async function toggleWishlist(event, packageId) {
             event.stopPropagation(); 
             if (!currentUser) {
@@ -214,32 +223,38 @@
             
             const action = heartIcon.classList.contains('heart-active') ? 'add' : 'remove';
             
+            // Fast UI update
             if (action === 'add') {
                 if(!myWishlistIds.includes(packageId)) myWishlistIds.push(packageId);
             } else {
                 myWishlistIds = myWishlistIds.filter(id => id !== packageId);
             }
 
+            // DB Update
             try {
                 await fetch(`${API_BASE_URL}/api/wishlist/toggle`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: currentUser.email, package_id: packageId, action: action })
                 });
-            } catch(e) {}
+                console.log(`DB Update Success: ${action} package ${packageId}`);
+            } catch(e) { console.error("Wishlist DB Update Failed", e); }
         }
 
+        // 🌟 FIXED: REMOVE FROM DB FUNCTION 🌟
         async function removeFromWishlist(packageId) {
             if(confirm("Are you sure you want to remove this package from your wishlist?")) {
                 myWishlistIds = myWishlistIds.filter(id => id !== packageId);
+                
                 try {
                     await fetch(`${API_BASE_URL}/api/wishlist/toggle`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ email: currentUser.email, package_id: packageId, action: 'remove' })
                     });
-                } catch(e) {}
-                loadWishlistPage(); 
+                } catch(e) { console.error("Wishlist DB Remove Failed", e); }
+
+                loadWishlistPage(); // Reload to reflect changes
             }
         }
 
@@ -301,7 +316,7 @@
                 const res = await fetch(`${API_BASE_URL}/api/packages/all`);
                 globalPackages = await res.json();
                 return globalPackages;
-            } catch(e) { return []; }
+            } catch(e) { console.error("API Error", e); return []; }
         }
 
         function generatePackageCard(pkg) {
@@ -428,48 +443,14 @@
             btn.innerText = "SENDING...";
             btn.classList.add('opacity-75', 'cursor-not-allowed');
             btn.disabled = true;
-            setTimeout(() => {
-                alert("Thank you! Your enquiry has been received. (Backend connection pending)");
-                form.reset();
-                btn.innerText = originalText;
-                btn.classList.remove('opacity-75', 'cursor-not-allowed');
-                btn.disabled = false;
-                loadHome();
-                window.scrollTo(0,0);
-            }, 1500);
-        }
-
-        function generateAIBuilderHTML() {
-            return `
-            <section id="ai-builder" class="py-24 bg-darkBg text-white relative overflow-hidden mt-10">
-                <div class="absolute inset-0 opacity-10 bg-[url('https://loremflickr.com/1920/1080/travel,map?lock=55')] bg-cover bg-center"></div>
-                <div class="max-w-5xl mx-auto px-6 relative z-10">
-                    <div class="text-center mb-12">
-                        <h2 class="text-4xl md:text-5xl font-serif font-bold mb-4">✨ Design Your AI Trip</h2>
-                        <p class="text-brandLight text-sm font-bold uppercase tracking-widest">Powered by Gemini AI Engine</p>
-                    </div>
-                    <div class="bg-white text-gray-800 rounded-2xl shadow-2xl p-8 md:p-10 border-t-4 border-brand">
-                        <form id="ai-itinerary-form" onsubmit="generateItinerary(event)" class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div><label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Destination</label><input type="text" id="ai-dest" placeholder="e.g., Manali, Paris, Bali" class="w-full border border-gray-200 p-4 text-sm rounded outline-none focus:border-brand transition bg-gray-50" required></div>
-                            <div><label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Duration (Days)</label><input type="number" id="ai-days" min="1" max="30" placeholder="e.g., 5" class="w-full border border-gray-200 p-4 text-sm rounded outline-none focus:border-brand transition bg-gray-50" required></div>
-                            <div><label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Budget (₹)</label><input type="number" id="ai-budget" placeholder="e.g., 50000" class="w-full border border-gray-200 p-4 text-sm rounded outline-none focus:border-brand transition bg-gray-50" required></div>
-                            <div><label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Travel Vibe</label>
-                                <select id="ai-vibe" class="w-full border border-gray-200 p-4 text-sm rounded outline-none focus:border-brand transition bg-gray-50" required>
-                                    <option value="Romantic/Honeymoon">Romantic / Honeymoon</option><option value="Adventure">Adventure & Thrill</option><option value="Relaxing">Relaxing & Chill</option><option value="Cultural">Cultural & Historic</option><option value="Family">Family Friendly</option>
-                                </select>
-                            </div>
-                            <div class="md:col-span-2 mt-4 text-center"><button type="submit" id="generate-btn" class="bg-brand text-white font-bold uppercase tracking-widest px-14 py-4 rounded-full text-sm hover:bg-teal-800 transition shadow-lg w-full md:w-auto">✨ Generate AI Plan</button></div>
-                        </form>
-                        <div id="ai-result-box" class="mt-10 hidden border-t border-gray-100 pt-8">
-                            <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-                                <h3 class="text-2xl font-serif font-bold text-darkBg">Your Custom AI Itinerary:</h3>
-                                <button id="download-pdf-btn" onclick="downloadItineraryPDF()" class="hidden bg-darkBg text-white px-5 py-3 rounded-full text-[10px] uppercase font-bold tracking-widest hover:bg-brand transition shadow-md flex items-center gap-2">📥 Download PDF</button>
-                            </div>
-                            <div id="ai-itinerary-content" class="text-gray-700 leading-relaxed text-sm space-y-4 bg-gray-50 p-6 rounded-xl border border-gray-100"></div>
-                        </div>
-                    </div>
-                </div>
-            </section>`;
+            const formData = new FormData(form);
+            try {
+                const response = await fetch('https://api.web3forms.com/submit', { method: 'POST', body: formData });
+                const data = await response.json();
+                if (data.success) { alert("Thank you! Your enquiry has been received."); form.reset(); } 
+                else { alert("Oops! Something went wrong."); }
+            } catch (error) { alert("Network error."); }
+            finally { btn.innerText = originalText; btn.classList.remove('opacity-75', 'cursor-not-allowed'); btn.disabled = false; }
         }
 
         async function generateItinerary(e) {
@@ -552,21 +533,6 @@
             });
         }
 
-        function generateContactForm(title) {
-            return `
-                <section id="contact-form" class="py-20 px-6 bg-gray-100">
-                    <div class="max-w-4xl mx-auto bg-white p-8 md:p-12 shadow-[0_20px_50px_rgba(0,0,0,0.05)] rounded-2xl border border-gray-100">
-                        <h2 class="font-serif text-4xl mb-8 text-darkBg font-bold text-center">${title}</h2>
-                        <form class="space-y-5" onsubmit="handleFormSubmit(event)">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5"><input type="text" name="Name" placeholder="Name *" class="w-full border border-gray-200 p-4 text-sm outline-none rounded bg-gray-50" required><input type="text" name="City" placeholder="City *" class="w-full border border-gray-200 p-4 text-sm outline-none rounded bg-gray-50" required></div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5"><input type="email" name="Email" placeholder="Email Address *" class="w-full border border-gray-200 p-4 text-sm outline-none rounded bg-gray-50" required><input type="tel" name="Phone" placeholder="Phone *" class="w-full border border-gray-200 p-4 text-sm outline-none rounded bg-gray-50" required></div>
-                            <input type="text" name="Destination" id="travel-destination-input" placeholder="Travel Destination" class="w-full border border-gray-200 p-4 text-sm outline-none rounded bg-gray-50 font-bold text-darkBg">
-                            <div class="text-center pt-4"><button type="submit" class="bg-brand text-white font-bold uppercase tracking-widest px-14 py-4 rounded-full text-sm hover:bg-teal-800 transition">Submit Enquiry</button></div>
-                        </form>
-                    </div>
-                </section>`;
-        }
-
         const siteData = {
             home: { title: "Home", action: "loadHome()" },
             company: { title: "Company", isSimpleDropdown: true, links: ["About Us", "History", "Awards", "Careers", "Blog", "FAQs"] },
@@ -597,6 +563,55 @@
             navRoot.innerHTML = navHTML;
         }
 
+        function generateAIBuilderHTML() {
+            return `
+            <section id="ai-builder" class="py-24 bg-darkBg text-white relative overflow-hidden mt-10">
+                <div class="absolute inset-0 opacity-10 bg-[url('https://loremflickr.com/1920/1080/travel,map?lock=55')] bg-cover bg-center"></div>
+                <div class="max-w-5xl mx-auto px-6 relative z-10">
+                    <div class="text-center mb-12">
+                        <h2 class="text-4xl md:text-5xl font-serif font-bold mb-4">✨ Design Your AI Trip</h2>
+                        <p class="text-brandLight text-sm font-bold uppercase tracking-widest">Powered by Gemini AI Engine</p>
+                    </div>
+                    <div class="bg-white text-gray-800 rounded-2xl shadow-2xl p-8 md:p-10 border-t-4 border-brand">
+                        <form id="ai-itinerary-form" onsubmit="generateItinerary(event)" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div><label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Destination</label><input type="text" id="ai-dest" placeholder="e.g., Manali, Paris, Bali" class="w-full border border-gray-200 p-4 text-sm rounded outline-none focus:border-brand transition bg-gray-50" required></div>
+                            <div><label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Duration (Days)</label><input type="number" id="ai-days" min="1" max="30" placeholder="e.g., 5" class="w-full border border-gray-200 p-4 text-sm rounded outline-none focus:border-brand transition bg-gray-50" required></div>
+                            <div><label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Budget (₹)</label><input type="number" id="ai-budget" placeholder="e.g., 50000" class="w-full border border-gray-200 p-4 text-sm rounded outline-none focus:border-brand transition bg-gray-50" required></div>
+                            <div><label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Travel Vibe</label>
+                                <select id="ai-vibe" class="w-full border border-gray-200 p-4 text-sm rounded outline-none focus:border-brand transition bg-gray-50" required>
+                                    <option value="Romantic/Honeymoon">Romantic / Honeymoon</option><option value="Adventure">Adventure & Thrill</option><option value="Relaxing">Relaxing & Chill</option><option value="Cultural">Cultural & Historic</option><option value="Family">Family Friendly</option>
+                                </select>
+                            </div>
+                            <div class="md:col-span-2 mt-4 text-center"><button type="submit" id="generate-btn" class="bg-brand text-white font-bold uppercase tracking-widest px-14 py-4 rounded-full text-sm hover:bg-teal-800 transition shadow-lg w-full md:w-auto">✨ Generate AI Plan</button></div>
+                        </form>
+                        <div id="ai-result-box" class="mt-10 hidden border-t border-gray-100 pt-8">
+                            <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                                <h3 class="text-2xl font-serif font-bold text-darkBg">Your Custom AI Itinerary:</h3>
+                                <button id="download-pdf-btn" onclick="downloadItineraryPDF()" class="hidden bg-darkBg text-white px-5 py-3 rounded-full text-[10px] uppercase font-bold tracking-widest hover:bg-brand transition shadow-md flex items-center gap-2">📥 Download PDF</button>
+                            </div>
+                            <div id="ai-itinerary-content" class="text-gray-700 leading-relaxed text-sm space-y-4 bg-gray-50 p-6 rounded-xl border border-gray-100"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>`;
+        }
+
+        function generateContactForm(title) {
+            return `
+                <section id="contact-form" class="py-20 px-6 bg-gray-100">
+                    <div class="max-w-4xl mx-auto bg-white p-8 md:p-12 shadow-[0_20px_50px_rgba(0,0,0,0.05)] rounded-2xl border border-gray-100">
+                        <h2 class="font-serif text-4xl mb-8 text-darkBg font-bold text-center">${title}</h2>
+                        <form class="space-y-5" onsubmit="handleFormSubmit(event)" action="https://api.web3forms.com/submit" method="POST">
+                            <input type="hidden" name="access_key" value="3d528287-a6bf-4c1b-8242-cd5900b71199">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5"><input type="text" name="Name" placeholder="Name *" class="w-full border border-gray-200 p-4 text-sm outline-none rounded bg-gray-50" required><input type="text" name="City" placeholder="City *" class="w-full border border-gray-200 p-4 text-sm outline-none rounded bg-gray-50" required></div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5"><input type="email" name="Email" placeholder="Email Address *" class="w-full border border-gray-200 p-4 text-sm outline-none rounded bg-gray-50" required><input type="tel" name="Phone" placeholder="Phone *" class="w-full border border-gray-200 p-4 text-sm outline-none rounded bg-gray-50" required></div>
+                            <input type="text" name="Destination" id="travel-destination-input" placeholder="Travel Destination" class="w-full border border-gray-200 p-4 text-sm outline-none rounded bg-gray-50 font-bold text-darkBg">
+                            <div class="text-center pt-4"><button type="submit" class="bg-brand text-white font-bold uppercase tracking-widest px-14 py-4 rounded-full text-sm hover:bg-teal-800 transition">Submit Enquiry</button></div>
+                        </form>
+                    </div>
+                </section>`;
+        }
+
         async function loadHome() {
             document.getElementById('app-root').innerHTML = `
                 <div class="page-fade-enter">
@@ -624,7 +639,6 @@
             else { grid.innerHTML = `<div class="col-span-full text-center py-20"><p class="text-gray-500">No packages found. Add some in the Admin Panel!</p></div>`; }
         }
 
-        // 🌟 India Logic Fixed Here 🌟
         async function loadCategoryPage(categoryKey) {
             const catData = siteData[categoryKey] || { title: categoryKey };
             document.getElementById('app-root').innerHTML = `
@@ -637,27 +651,8 @@
                     ${generateContactForm("Enquire for " + catData.title)}
                 </div>`;
             window.scrollTo(0,0);
-            
             const packages = globalPackages.length ? globalPackages : await fetchRealPackages();
-            
-            const filtered = packages.filter(p => {
-                const searchStr = catData.title.toLowerCase();
-                if (searchStr === 'packages') return true; 
-                
-                const catStr = (p.category || '').toLowerCase();
-                const destStr = (p.destination || '').toLowerCase();
-                
-                if (searchStr === 'india') {
-                    return catStr.includes('india') || 
-                           catStr.includes('west') || 
-                           catStr.includes('south') || 
-                           catStr.includes('north') ||
-                           ['manali', 'kashmir', 'agra', 'kerala', 'ooty', 'kodaikanal', 'goa', 'rajasthan', 'andaman'].includes(destStr);
-                }
-                
-                return catStr.includes(searchStr);
-            });
-
+            const filtered = packages.filter(p => (p.category && p.category.toLowerCase().includes(catData.title.toLowerCase())) || catData.title === 'Packages');
             const grid = document.getElementById('cat-packages-grid');
             if(filtered.length > 0) { grid.innerHTML = filtered.map(p => generatePackageCard(p)).join(''); } 
             else { grid.innerHTML = `<div class="col-span-full text-center py-20 bg-white rounded-2xl shadow-sm"><h3 class="text-2xl font-serif text-darkBg mb-4">New ${catData.title} Packages are being curated!</h3><p class="text-gray-500">Check back soon or send us an enquiry.</p></div>`; }
@@ -683,21 +678,18 @@
         }
 
         function loadGroupToursPage() { loadCategoryPage('Group Tours'); }
-
         function loadWeddingPage() {
             let venuesHTML = ''; const venues = ["Bali", "Udaipur Palace", "Goa Beach", "Maldives Resort"];
             venues.forEach((v, i) => { venuesHTML += `<div class="relative h-[400px] rounded-xl overflow-hidden group cursor-pointer shadow-lg" onclick="prepareBooking('${v} Wedding')"><img src="https://loremflickr.com/600/800/wedding,${v.split(' ')[0]}?lock=${i+80}" class="w-full h-full object-cover transition duration-700 group-hover:scale-105 brightness-[0.8]"><div class="absolute inset-0 bg-gradient-to-t from-darkBg/90 to-transparent"></div><div class="absolute bottom-0 p-6 text-center w-full"><h3 class="font-serif text-3xl text-white mb-2">${v}</h3><button class="border border-white text-white px-6 py-2 text-[10px] uppercase tracking-widest hover:bg-white hover:text-darkBg transition">View Venues</button></div></div>`; });
             document.getElementById('app-root').innerHTML = `<div class="page-fade-enter bg-white min-h-screen pb-20"><div class="relative w-full h-[60vh] flex items-center justify-center"><img src="https://loremflickr.com/1600/900/wedding,couple" class="absolute inset-0 w-full h-full object-cover opacity-80"><div class="absolute inset-0 bg-black/40"></div><div class="relative z-10 text-center text-white px-4"><p class="font-bold uppercase tracking-[0.4em] text-[12px] mb-4 text-brandLight">Aura Weddings</p><h1 class="text-6xl md:text-8xl font-serif font-bold italic">Say "I Do" <br>in Paradise</h1></div></div><div class="max-w-screen-xl mx-auto px-6 py-20 text-center"><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">${venuesHTML}</div></div>${generateContactForm("Plan Your Destination Wedding")}</div>`;
             window.scrollTo(0,0);
         }
-
         function loadContactPage() {
             let locHTML = ''; const locations = ["Chennai HQ", "Bangalore Office", "Mumbai Branch", "Coimbatore Center"];
             locations.forEach((l, i) => { locHTML += `<div class="bg-white p-8 border border-gray-100 shadow-md rounded-xl text-center hover:border-brand transition"><div class="w-12 h-12 bg-brandLight text-brand rounded-full flex items-center justify-center mx-auto mb-4 text-xl">📍</div><h3 class="font-serif text-xl font-bold text-darkBg mb-2">${l}</h3><p class="text-sm font-bold text-brand">+91 6374644637</p></div>`; });
             document.getElementById('app-root').innerHTML = `<div class="page-fade-enter bg-[#f8fafc] min-h-screen pb-20"><div class="bg-darkBg py-24 text-center"><h1 class="text-5xl md:text-6xl font-serif font-bold text-white mb-4">Contact Aura</h1></div><div class="max-w-screen-xl mx-auto px-6 py-16"><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">${locHTML}</div></div>${generateContactForm("Drop Us a Message")}</div>`;
             window.scrollTo(0,0);
         }
-
         function loadCompanyPage(pageName) {
             document.getElementById('app-root').innerHTML = `<div class="page-fade-enter bg-gray-50 min-h-screen pb-20"><div class="bg-darkBg py-24 text-center"><h1 class="text-5xl font-serif font-bold text-brandLight mb-4">${pageName}</h1></div><div class="max-w-screen-lg mx-auto px-6 py-20 bg-white shadow-xl -mt-10 relative z-20 rounded-2xl"><h2 class="text-3xl font-serif text-darkBg mb-6 border-l-4 border-brand pl-4">Aura ${pageName}</h2><p class="text-gray-600 leading-relaxed text-lg mb-8">Details about ${pageName} go here.</p></div></div>`;
             window.scrollTo(0,0);
