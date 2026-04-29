@@ -45,7 +45,7 @@ Since the backend API is already hosted live on Render, setting up the frontend 
 **1️⃣ Clone the repository**
 ```bash
 git clone [https://github.com/nirmalbabu05/Aura-Holidays.git](https://github.com/nirmalbabu05/Aura-Holidays.git)
-cd aura-holidays-frontend
+cd Aura-Holidays
 ```
 
 **2️⃣ Open the project in your favorite editor**
